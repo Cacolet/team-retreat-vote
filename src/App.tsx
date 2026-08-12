@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   ArrowRight,
   CalendarCheck,
-  CalendarDays,
   Check,
   ChevronRight,
   CircleHelp,
@@ -60,20 +59,22 @@ function attendanceDates(weekends: Weekend[]): AttendanceDate[] {
 
 export function App() {
   const [month, setMonth] = useState<Month>(8)
-  const [duration, setDuration] = useState<Duration>('1day')
+  const [duration] = useState<Duration>('1day')
   const [selectedId, setSelectedId] = useState('8-1')
   const [votes, setVotes] = useState<Record<string, number>>({})
   const [isSuggestionOpen, setSuggestionOpen] = useState(false)
   const [isVoteOpen, setVoteOpen] = useState(false)
   const [toast, setToast] = useState('')
 
-  const filteredTrips = useMemo(() => trips.filter((trip) => trip.month === month && trip.duration === duration), [month, duration])
-  const selectedTrip = filteredTrips.find((trip) => trip.id === selectedId) || filteredTrips[0]
+  const monthTrips = useMemo(() => trips.filter((trip) => trip.month === month), [month])
+  const oneDayTrips = useMemo(() => monthTrips.filter((trip) => trip.duration === '1day'), [monthTrips])
+  const overnightTrips = useMemo(() => monthTrips.filter((trip) => trip.duration === '2day'), [monthTrips])
+  const selectedTrip = monthTrips.find((trip) => trip.id === selectedId) || monthTrips[0]
 
   useEffect(() => {
-    const next = filteredTrips[0]
-    if (next && !filteredTrips.some((trip) => trip.id === selectedId)) setSelectedId(next.id)
-  }, [filteredTrips, selectedId])
+    const next = monthTrips[0]
+    if (next && !monthTrips.some((trip) => trip.id === selectedId)) setSelectedId(next.id)
+  }, [monthTrips, selectedId])
 
   useEffect(() => {
     loadVoteCounts().then((counts) => { if (counts) setVotes(counts) })
@@ -90,11 +91,6 @@ export function App() {
     setSelectedId('')
   }
 
-  function setDurationAndReset(value: Duration) {
-    setDuration(value)
-    setSelectedId('')
-  }
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -107,21 +103,18 @@ export function App() {
 
       <main>
         <section className="planner-board" id="planner" aria-label="团建方案筛选与投票">
+          <aside className="control-rail" aria-label="行程筛选">
+            <div className="rail-title"><span>筛选条件</span><small>选择出行月份</small></div>
+            <div className="cascade-step"><div className="cascade-label"><span>01</span><strong>出行月份</strong></div><div className="month-picker">{monthLabels.map((item) => <button key={item.value} className={month === item.value ? 'active' : ''} onClick={() => setMonthAndReset(item.value)}><strong>{item.label}</strong><small>{item.note}</small><ChevronRight size={14} /></button>)}</div></div>
+            <div className="cascade-summary"><CalendarCheck size={16} /><span>当前月份</span><strong>{month} 月 · {monthTrips.length} 个方案</strong></div>
+          </aside>
           <div className="results-area">
-            <div className="planner-heading"><div><p>先选时间，再比较方案</p><h1>选择最想去的团建方案</h1></div><span>共 {filteredTrips.length} 个可选方案</span></div>
-
-            <section className="filter-cascade" aria-label="行程筛选">
-              <div className="cascade-step"><div className="cascade-label"><span>1</span><strong>出行月份</strong></div><div className="month-picker">{monthLabels.map((item) => <button key={item.value} className={month === item.value ? 'active' : ''} onClick={() => setMonthAndReset(item.value)}><strong>{item.label}</strong><small>{item.note}</small></button>)}</div></div>
-              <ChevronRight className="cascade-arrow" size={18} aria-hidden="true" />
-              <div className="cascade-step"><div className="cascade-label"><span>2</span><strong>行程时长</strong></div><div className="duration-switch" role="tablist" aria-label="出行时长"><button className={duration === '1day' ? 'active' : ''} onClick={() => setDurationAndReset('1day')} role="tab" aria-selected={duration === '1day'}><span>1 天</span><small>当天往返</small></button><button className={duration === '2day' ? 'active' : ''} onClick={() => setDurationAndReset('2day')} role="tab" aria-selected={duration === '2day'}><span>2 天 1 夜</span><small>住下来慢慢玩</small></button></div></div>
-              <ChevronRight className="cascade-arrow" size={18} aria-hidden="true" />
-              <div className="cascade-summary"><CalendarCheck size={17} /><span>正在查看</span><strong>{month} 月 · {duration === '1day' ? '1 天方案' : '2 天 1 夜方案'}</strong></div>
-            </section>
-
+            <div className="planner-heading"><div><p>团建方案库</p><h1>选择最想去的团建方案</h1></div><span>{monthTrips.length} 个方案</span></div>
             <div className="bottom-grid">
               <section className="trip-list-panel">
-                <div className="list-heading"><div><h2>候选方案</h2><p>点击左侧方案查看详情与社区参考</p></div></div>
-                <div className="trip-list">{filteredTrips.map((trip, index) => <TripListItem key={trip.id} trip={trip} index={index} active={selectedTrip?.id === trip.id} votes={votes[trip.id] || 0} onClick={() => setSelectedId(trip.id)} />)}</div>
+                <div className="list-heading"><div><h2>候选方案</h2><p>按行程时长分组，点击方案查看详情</p></div></div>
+                <TripGroup label="1 天 · 当天往返" note="轻装出发，周六或周日均可投票" trips={oneDayTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
+                <TripGroup label="2 天 1 夜 · 住下来慢慢玩" note="选择完整周末，周六入住、周日返程" trips={overnightTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
               </section>
               <section className="detail-panel">{selectedTrip ? <TripDetail trip={selectedTrip} votes={votes[selectedTrip.id] || 0} onVote={() => setVoteOpen(true)} /> : <div className="empty-detail"><CircleHelp size={32} /><p>选择左侧方案，查看完整行程</p></div>}</section>
             </div>
@@ -138,8 +131,12 @@ export function App() {
   )
 }
 
+function TripGroup({ label, note, trips: groupTrips, activeId, votes, onSelect }: { label: string; note: string; trips: TripPlan[]; activeId?: string; votes: Record<string, number>; onSelect: (id: string) => void }) {
+  return <section className="trip-group"><div className="trip-group-heading"><div><strong>{label}</strong><small>{note}</small></div><span>{groupTrips.length}</span></div><div className="trip-list">{groupTrips.map((trip, index) => <TripListItem key={trip.id} trip={trip} index={index} active={activeId === trip.id} votes={votes[trip.id] || 0} onClick={() => onSelect(trip.id)} />)}</div></section>
+}
+
 function TripListItem({ trip, index, active, votes, onClick }: { trip: TripPlan; index: number; active: boolean; votes: number; onClick: () => void }) {
-  return <button className={`trip-item ${active ? 'active' : ''}`} onClick={onClick}><span className={`trip-index accent-${trip.accent}`}>{String(index + 1).padStart(2, '0')}</span><span className="trip-item-main"><strong>{trip.destination}</strong><span>{trip.title}</span><small>{trip.tags.slice(0, 2).join(' · ')}</small></span><span className="trip-item-side"><b>{votes}</b><small>票</small><ChevronRight size={15} /></span></button>
+  return <button className={`trip-item duration-${trip.duration} ${active ? 'active' : ''}`} onClick={onClick}><span className="trip-index">{String(index + 1).padStart(2, '0')}</span><span className="trip-item-main"><strong>{trip.destination}</strong><span>{trip.title}</span><small>{trip.tags.slice(0, 2).join(' · ')}</small></span><span className="trip-item-side"><b>{votes}</b><small>票</small><ChevronRight size={15} /></span></button>
 }
 
 function TripDetail({ trip, votes, onVote }: { trip: TripPlan; votes: number; onVote: () => void }) {
