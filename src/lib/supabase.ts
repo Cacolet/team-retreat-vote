@@ -1,19 +1,19 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const url = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || undefined
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || undefined
 
 export const hasSupabase = Boolean(url && anonKey)
 export const supabase: SupabaseClient | null = hasSupabase ? createClient(url!, anonKey!) : null
 
 const voterStorageKey = 'team-retreat-voter-key'
 
-export function getVoterKey() {
-  const current = localStorage.getItem(voterStorageKey)
-  if (current) return current
-  const next = crypto.randomUUID()
-  localStorage.setItem(voterStorageKey, next)
-  return next
+function getVoterKey() {
+  const saved = localStorage.getItem(voterStorageKey)
+  if (saved) return saved
+  const voterKey = crypto.randomUUID()
+  localStorage.setItem(voterStorageKey, voterKey)
+  return voterKey
 }
 
 export async function loadVoteCounts() {
@@ -26,27 +26,26 @@ export async function loadVoteCounts() {
   }, {})
 }
 
-export async function submitVote(tripId: string, month: number, duration: string) {
-  const voterKey = getVoterKey()
-  const localKey = `voted:${tripId}`
-  if (localStorage.getItem(localKey)) return { ok: false, reason: 'already-voted' as const }
-
-  if (supabase) {
-    const { error } = await supabase.from('trip_votes').insert({
-      trip_id: tripId,
-      month,
-      duration,
-      voter_key: voterKey,
-    })
-    if (error) return { ok: false, reason: 'database' as const, message: error.message }
-  }
-
-  localStorage.setItem(localKey, '1')
-  return { ok: true as const }
+export async function submitVote(input: { tripId: string; month: number; duration: string; voterName: string; weekendStart: string; weekendEnd: string; attendanceDate: string }) {
+  if (!supabase) return { ok: false as const, reason: 'not-configured' as const }
+  const { error } = await supabase.from('trip_votes').insert({
+    trip_id: input.tripId,
+    month: input.month,
+    duration: input.duration,
+    voter_name: input.voterName,
+    weekend_start: input.weekendStart,
+    weekend_end: input.weekendEnd,
+    attendance_date: input.attendanceDate,
+    voter_key: getVoterKey(),
+  })
+  if (!error) return { ok: true as const }
+  return error.code === '23505'
+    ? { ok: false as const, reason: 'already-voted' as const }
+    : { ok: false as const, reason: 'database' as const, message: error.message }
 }
 
 export async function submitSuggestion(input: { month: number; duration: string; itinerary: string }) {
-  if (!supabase) return { ok: false, reason: 'not-configured' as const }
+  if (!supabase) return { ok: false as const, reason: 'not-configured' as const }
   const { error } = await supabase.from('trip_suggestions').insert(input)
-  return error ? { ok: false, reason: 'database' as const, message: error.message } : { ok: true as const }
+  return error ? { ok: false as const, reason: 'database' as const, message: error.message } : { ok: true as const }
 }
