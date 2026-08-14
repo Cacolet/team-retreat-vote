@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { monthLabels, trips, type Duration, type Month, type TripPlan } from './data/trips'
+import { officialCalendar } from './data/holidayCalendar'
 import { hasSupabase, loadVoteCounts, submitSuggestion, submitVote } from './lib/supabase'
 
 type Workspace = 'opinions' | 'final'
@@ -27,6 +28,25 @@ type AttendanceDate = { value: string; label: string; weekday: '周六' | '周�
 
 function pad(value: number) {
   return String(value).padStart(2, '0')
+}
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function getOfficialDayStatus(date: Date) {
+  const calendar = officialCalendar[date.getFullYear()]
+  const key = dateKey(date)
+  return {
+    isHoliday: calendar?.holidays.includes(key) || false,
+    isMakeupWorkday: calendar?.makeupWorkdays.includes(key) || false,
+  }
+}
+
+function isSelectableRestDay(date: Date, today: Date) {
+  const isWeekend = date.getDay() === 0 || date.getDay() === 6
+  const { isHoliday, isMakeupWorkday } = getOfficialDayStatus(date)
+  return isWeekend && date >= today && !isHoliday && !isMakeupWorkday
 }
 
 function availableWeekends(month: Month): Weekend[] {
@@ -39,7 +59,7 @@ function availableWeekends(month: Month): Weekend[] {
     const saturday = new Date(year, month - 1, day)
     if (saturday.getDay() !== 6) continue
     const sunday = new Date(year, month - 1, day + 1)
-    if (sunday.getMonth() !== month - 1 || sunday < currentDay) continue
+    if (sunday.getMonth() !== month - 1 || !isSelectableRestDay(saturday, currentDay) || !isSelectableRestDay(sunday, currentDay)) continue
     weekends.push({
       start: `${year}-${pad(month)}-${pad(day)}`,
       end: `${year}-${pad(month)}-${pad(day + 1)}`,
@@ -49,8 +69,8 @@ function availableWeekends(month: Month): Weekend[] {
   return weekends
 }
 
-function attendanceDates(weekends: Weekend[]): AttendanceDate[] {
-  return weekends.flatMap((weekend) => {
+function availableAttendanceDates(month: Month): AttendanceDate[] {
+  return availableWeekends(month).flatMap((weekend) => {
     const start = new Date(`${weekend.start}T00:00:00`)
     const end = new Date(`${weekend.end}T00:00:00`)
     return [
@@ -127,8 +147,8 @@ export function App() {
                 <div className="bottom-grid">
                   <section className="trip-list-panel">
                     <div className="list-heading"><div><h2>候选方案</h2><p>按行程时长分组，点击方案查看详情</p></div></div>
-                    <TripGroup label="1 天 · 当天往返" note="轻装出发，周六或周日均可投票" trips={oneDayTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
-                    <TripGroup label="2 天 1 夜 · 住下来慢慢玩" note="选择完整周末，周六入住、周日返程" trips={overnightTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
+                    <TripGroup label="1 天 · 当天往返" note="已排除假期与调休上班日，选可休的周六或周日" trips={oneDayTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
+                    <TripGroup label="2 天 1 夜 · 住下来慢慢玩" note="仅保留两天都可休的完整周末" trips={overnightTrips} activeId={selectedTrip?.id} votes={votes} onSelect={setSelectedId} />
                   </section>
                   <section className="detail-panel">{selectedTrip ? <TripDetail trip={selectedTrip} votes={votes[selectedTrip.id] || 0} onVote={() => setVoteOpen(true)} /> : <div className="empty-detail"><CircleHelp size={32} /><p>选择左侧方案，查看完整行程</p></div>}</section>
                 </div>
@@ -210,12 +230,13 @@ function CommunitySources({ trip }: { trip: TripPlan }) {
 
 function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; onClose: () => void; onSuccess: () => void; onFailure: (message: string) => void }) {
   const weekends = useMemo(() => availableWeekends(trip.month), [trip.month])
-  const dates = useMemo(() => attendanceDates(weekends), [weekends])
+  const dates = useMemo(() => availableAttendanceDates(trip.month), [trip.month])
   const [name, setName] = useState('')
   const [selectedDate, setSelectedDate] = useState(dates[0]?.value || '')
   const [selectedWeekend, setSelectedWeekend] = useState(weekends[0]?.start || '')
   const [submitting, setSubmitting] = useState(false)
   const isOneDay = trip.duration === '1day'
+  const hasAvailableDates = isOneDay ? dates.length > 0 : weekends.length > 0
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -231,5 +252,5 @@ function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; on
     else onFailure(hasSupabase ? '数据库暂时不可用，请稍后再试' : '请先配置数据库连接，再提交真实投票')
   }
 
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Heart size={20} /></div><div className="section-kicker">YOUR AVAILABILITY</div><h2>提交你的投票意向</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><label>你的姓名<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：王小明" maxLength={30} required autoFocus /></label><fieldset><legend>{isOneDay ? '你能参加哪一天？' : '你能参加哪个完整周末？'}</legend>{weekends.length ? isOneDay ? <div className="attendance-grid">{dates.map((date) => <label className={`attendance-option ${selectedDate === date.value ? 'selected' : ''}`} key={date.value}><input type="radio" name="attendance-date" value={date.value} checked={selectedDate === date.value} onChange={() => setSelectedDate(date.value)} /><span><strong>{date.label}</strong><small>{date.weekday} · {date.weekend.label}</small></span><Check size={16} /></label>)}</div> : <div className="weekend-list">{weekends.map((weekend) => <label className={`weekend-option ${selectedWeekend === weekend.start ? 'selected' : ''}`} key={weekend.start}><input type="radio" name="weekend" value={weekend.start} checked={selectedWeekend === weekend.start} onChange={() => setSelectedWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>)}</div> : <p className="no-weekends">这个月份已经没有从今天起可选择的日期了，请选择其他月份。</p>}</fieldset><button className="submit-suggestion" disabled={submitting || !weekends.length}>{submitting ? '提交中…' : '确认并投票'} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 姓名与日期仅用于本次团建排期</div></div></div>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Heart size={20} /></div><div className="section-kicker">YOUR AVAILABILITY</div><h2>提交你的投票意向</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><label>你的姓名<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：王小明" maxLength={30} required autoFocus /></label><fieldset><legend>{isOneDay ? '你能参加哪一天？' : '你能参加哪个完整周末？'}</legend><p className="calendar-rule">仅提供完整可休周末，已排除法定节假日和周末调休上班日</p>{hasAvailableDates ? isOneDay ? <div className="attendance-grid">{dates.map((date) => <label className={`attendance-option ${selectedDate === date.value ? 'selected' : ''}`} key={date.value}><input type="radio" name="attendance-date" value={date.value} checked={selectedDate === date.value} onChange={() => setSelectedDate(date.value)} /><span><strong>{date.label}</strong><small>{date.weekday} · {date.weekend.label}</small></span><Check size={16} /></label>)}</div> : <div className="weekend-list">{weekends.map((weekend) => <label className={`weekend-option ${selectedWeekend === weekend.start ? 'selected' : ''}`} key={weekend.start}><input type="radio" name="weekend" value={weekend.start} checked={selectedWeekend === weekend.start} onChange={() => setSelectedWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>)}</div> : <p className="no-weekends">这个月份已经没有符合条件的休息日，请选择其他月份。</p>}</fieldset><button className="submit-suggestion" disabled={submitting || !hasAvailableDates}>{submitting ? '提交中…' : '确认并投票'} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 姓名与日期仅用于本次团建排期</div></div></div>
 }
