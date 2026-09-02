@@ -7,6 +7,7 @@ import { hasSupabase, submitVote } from './lib/supabase'
 type Weekend = { start: string; end: string; label: string }
 
 const votingMonths = [9, 10]
+const excludedWeekendStarts = new Set(['2026-09-05'])
 
 function pad(value: number) {
   return String(value).padStart(2, '0')
@@ -34,8 +35,9 @@ function availableWeekends(): Weekend[] {
       const saturday = new Date(year, month - 1, day)
       if (saturday.getDay() !== 6) continue
       const sunday = new Date(year, month - 1, day + 1)
-      if (sunday.getMonth() !== month - 1 || !isSelectableRestDay(saturday, today) || !isSelectableRestDay(sunday, today)) continue
-      weekends.push({ start: dateKey(saturday), end: dateKey(sunday), label: `${month} 月 ${day} 日 — ${day + 1} 日` })
+      const start = dateKey(saturday)
+      if (sunday.getMonth() !== month - 1 || excludedWeekendStarts.has(start) || !isSelectableRestDay(saturday, today) || !isSelectableRestDay(sunday, today)) continue
+      weekends.push({ start, end: dateKey(sunday), label: `${month} 月 ${day} 日 — ${day + 1} 日` })
     }
   }
   return weekends
