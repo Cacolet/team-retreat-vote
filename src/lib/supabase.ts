@@ -22,7 +22,7 @@ export async function submitVote(input: {
   duration: string
   adults: number
   children: number
-  weekends: { month: number; start: string; end: string }[]
+  weekends: { month: number; start: string; end: string; isPriority: boolean }[]
 }) {
   if (!supabase) return { ok: false as const, reason: 'not-configured' as const }
   const voterKey = getVoterKey()
@@ -37,6 +37,7 @@ export async function submitVote(input: {
     attendance_date: weekend.start,
     adult_count: input.adults,
     child_count: input.children,
+    is_priority: weekend.isPriority,
     voter_key: voterKey,
   })))
   if (!error) return { ok: true as const }

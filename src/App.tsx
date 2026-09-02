@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowRight, CalendarCheck, Check, ChevronRight, CircleHelp, Compass, ExternalLink, Heart, Lightbulb, MapPin, Minus, Plus, Search, Ticket, Users, X } from 'lucide-react'
+import { ArrowRight, CalendarCheck, Check, ChevronRight, CircleHelp, Compass, ExternalLink, Heart, Lightbulb, MapPin, Minus, Plus, Search, Star, Ticket, Users, X } from 'lucide-react'
 import { trips, type TripPlan } from './data/trips'
 import { officialCalendar } from './data/holidayCalendar'
 import { hasSupabase, submitVote } from './lib/supabase'
@@ -117,6 +117,7 @@ function CommunitySources({ trip }: { trip: TripPlan }) {
 function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; onClose: () => void; onSuccess: () => void; onFailure: (message: string) => void }) {
   const weekends = useMemo(() => availableWeekends(), [])
   const [selectedWeekendStarts, setSelectedWeekendStarts] = useState<string[]>([])
+  const [priorityWeekendStarts, setPriorityWeekendStarts] = useState<string[]>([])
   const [voterName, setVoterName] = useState('')
   const [adults, setAdults] = useState(1)
   const [children, setChildren] = useState(0)
@@ -128,7 +129,7 @@ function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; on
     const name = voterName.trim()
     if (!name || !selectedWeekends.length || adults + children < 1) return
     setSubmitting(true)
-    const result = await submitVote({ tripId: trip.id, voterName: name, duration: trip.duration, adults, children, weekends: selectedWeekends.map((weekend) => ({ ...weekend, month: new Date(`${weekend.start}T00:00:00`).getMonth() + 1 })) })
+    const result = await submitVote({ tripId: trip.id, voterName: name, duration: trip.duration, adults, children, weekends: selectedWeekends.map((weekend) => ({ ...weekend, month: new Date(`${weekend.start}T00:00:00`).getMonth() + 1, isPriority: priorityWeekendStarts.includes(weekend.start) })) })
     setSubmitting(false)
     if (result.ok) onSuccess()
     else if (result.reason === 'already-voted') onFailure('所选日期中有已提交记录，请取消该日期后重试')
@@ -136,10 +137,19 @@ function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; on
   }
 
   function toggleWeekend(weekendStart: string) {
-    setSelectedWeekendStarts((current) => current.includes(weekendStart) ? current.filter((item) => item !== weekendStart) : [...current, weekendStart])
+    const isSelected = selectedWeekendStarts.includes(weekendStart)
+    setSelectedWeekendStarts((current) => isSelected ? current.filter((item) => item !== weekendStart) : [...current, weekendStart])
+    if (isSelected) setPriorityWeekendStarts((current) => current.filter((item) => item !== weekendStart))
   }
 
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Users size={20} /></div><div className="section-kicker">FINAL VOTE</div><h2>选择日期与同行人数</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><fieldset className="voter-name-field"><legend>你的姓名</legend><label><span className="sr-only">姓名</span><input type="text" value={voterName} onChange={(event) => setVoterName(event.target.value)} placeholder="请填写姓名，方便汇总" maxLength={30} autoComplete="off" required /></label><small>仅用于本次投票汇总，关闭后不会保存在浏览器中。</small></fieldset><fieldset><legend>选择日期 <span className="multi-select-label">可多选</span></legend><p className="calendar-rule">勾选所有你能参加的完整周末，最终将选择大家都合适的时间；已排除法定节假日和周末调休上班日</p>{weekends.length ? <div className="weekend-list">{weekends.map((weekend) => <label className={`weekend-option ${selectedWeekendStarts.includes(weekend.start) ? 'selected' : ''}`} key={weekend.start}><input type="checkbox" name="weekend" value={weekend.start} checked={selectedWeekendStarts.includes(weekend.start)} onChange={() => toggleWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>)}</div> : <p className="no-weekends">目前没有符合条件的完整周末。</p>}</fieldset><fieldset><legend>同行人数</legend><div className="participant-grid"><NumberStepper label="大人" note="成人" value={adults} minimum={0} onChange={setAdults} /><NumberStepper label="小孩" note="儿童" value={children} minimum={0} onChange={setChildren} /></div></fieldset><button className="submit-suggestion" disabled={submitting || !voterName.trim() || !selectedWeekendStarts.length || adults + children < 1}>{submitting ? '提交中…' : `确认 ${selectedWeekendStarts.length} 个日期并投票`} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 每个勾选日期都会记录相同人数，用于汇总最适合全员的时间</div></div></div>
+  function togglePriority(weekendStart: string) {
+    setPriorityWeekendStarts((current) => {
+      if (current.includes(weekendStart)) return current.filter((item) => item !== weekendStart)
+      return current.length < 2 ? [...current, weekendStart] : current
+    })
+  }
+
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Users size={20} /></div><div className="section-kicker">FINAL VOTE</div><h2>选择日期与同行人数</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><fieldset className="voter-name-field"><legend>你的姓名</legend><label><span className="sr-only">姓名</span><input type="text" value={voterName} onChange={(event) => setVoterName(event.target.value)} placeholder="请填写姓名，方便汇总" maxLength={30} autoComplete="off" required /></label><small>仅用于本次投票汇总，关闭后不会保存在浏览器中。</small></fieldset><fieldset><legend>选择日期 <span className="multi-select-label">可多选</span></legend><p className="calendar-rule">勾选所有你能参加的完整周末，最终将选择大家都合适的时间；已排除法定节假日和周末调休上班日</p>{weekends.length ? <div className="weekend-list">{weekends.map((weekend) => { const isSelected = selectedWeekendStarts.includes(weekend.start); const isPriority = priorityWeekendStarts.includes(weekend.start); return <div className={`weekend-choice ${isSelected ? 'selected' : ''}`} key={weekend.start}><label className="weekend-option"><input type="checkbox" name="weekend" value={weekend.start} checked={isSelected} onChange={() => toggleWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>{isSelected && <button type="button" className={`priority-toggle ${isPriority ? 'active' : ''}`} onClick={() => togglePriority(weekend.start)} aria-pressed={isPriority} disabled={!isPriority && priorityWeekendStarts.length >= 2}><Star size={13} fill={isPriority ? 'currentColor' : 'none'} /> {isPriority ? '优先' : '设为优先'}</button>}</div> })}</div> : <p className="no-weekends">目前没有符合条件的完整周末。</p>}<p className="priority-hint"><Star size={12} /> 可选：最多标记 2 个更希望选的日期；未标记不会影响投票。</p></fieldset><fieldset><legend>同行人数</legend><div className="participant-grid"><NumberStepper label="大人" note="成人" value={adults} minimum={0} onChange={setAdults} /><NumberStepper label="小孩" note="儿童" value={children} minimum={0} onChange={setChildren} /></div></fieldset><button className="submit-suggestion" disabled={submitting || !voterName.trim() || !selectedWeekendStarts.length || adults + children < 1}>{submitting ? '提交中…' : `确认 ${selectedWeekendStarts.length} 个日期并投票`} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 可参加人数是主要依据；优先日期只用于辅助选择最合适的时间</div></div></div>
 }
 
 function NumberStepper({ label, note, value, minimum, onChange }: { label: string; note: string; value: number; minimum: number; onChange: (value: number) => void }) {
