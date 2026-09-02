@@ -16,22 +16,9 @@ function getVoterKey() {
   return voterKey
 }
 
-export async function loadVoteCounts() {
-  if (!supabase) return null
-  const { data, error } = await supabase.from('trip_votes').select('trip_id, voter_key, voter_name')
-  if (error || !data) return null
-  const votersByTrip = new Map<string, Set<string>>()
-  data.forEach((row) => {
-    const voter = row.voter_key || row.voter_name
-    const voters = votersByTrip.get(row.trip_id) || new Set<string>()
-    voters.add(voter)
-    votersByTrip.set(row.trip_id, voters)
-  })
-  return Object.fromEntries(Array.from(votersByTrip, ([tripId, voters]) => [tripId, voters.size])) as Record<string, number>
-}
-
 export async function submitVote(input: {
   tripId: string
+  voterName: string
   duration: string
   adults: number
   children: number
@@ -39,11 +26,12 @@ export async function submitVote(input: {
 }) {
   if (!supabase) return { ok: false as const, reason: 'not-configured' as const }
   const voterKey = getVoterKey()
+  const voterName = input.voterName.trim()
   const { error } = await supabase.from('trip_votes').insert(input.weekends.map((weekend) => ({
     trip_id: input.tripId,
     month: weekend.month,
     duration: input.duration,
-    voter_name: '匿名参与者',
+    voter_name: voterName,
     weekend_start: weekend.start,
     weekend_end: weekend.end,
     attendance_date: weekend.start,

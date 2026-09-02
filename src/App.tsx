@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CalendarCheck, Check, ChevronRight, CircleHelp, Compass, ExternalLink, Heart, Lightbulb, MapPin, Minus, Plus, Search, Ticket, Users, X } from 'lucide-react'
 import { trips, type TripPlan } from './data/trips'
 import { officialCalendar } from './data/holidayCalendar'
-import { hasSupabase, loadVoteCounts, submitVote } from './lib/supabase'
+import { hasSupabase, submitVote } from './lib/supabase'
 
 type Weekend = { start: string; end: string; label: string }
 
@@ -43,12 +43,10 @@ function availableWeekends(): Weekend[] {
 
 export function App() {
   const [selectedId, setSelectedId] = useState(trips[0].id)
-  const [votes, setVotes] = useState<Record<string, number>>({})
   const [isVoteOpen, setVoteOpen] = useState(false)
   const [toast, setToast] = useState('')
   const selectedTrip = trips.find((trip) => trip.id === selectedId) || trips[0]
 
-  useEffect(() => { loadVoteCounts().then((counts) => { if (counts) setVotes(counts) }) }, [])
   useEffect(() => {
     if (!toast) return
     const timer = window.setTimeout(() => setToast(''), 3600)
@@ -77,33 +75,33 @@ export function App() {
             <div className="bottom-grid">
               <section className="trip-list-panel">
                 <div className="list-heading"><div><h2>最终候选</h2><p>点击方案查看详情并选择所有可参加日期</p></div></div>
-                <TripGroup trips={trips} activeId={selectedTrip.id} votes={votes} onSelect={setSelectedId} />
+                <TripGroup trips={trips} activeId={selectedTrip.id} onSelect={setSelectedId} />
               </section>
-              <section className="detail-panel"><TripDetail trip={selectedTrip} votes={votes[selectedTrip.id] || 0} onVote={() => setVoteOpen(true)} /></section>
+              <section className="detail-panel"><TripDetail trip={selectedTrip} onVote={() => setVoteOpen(true)} /></section>
             </div>
           </div>
         </section>
       </section>
     </main>
 
-    {isVoteOpen && <VoteModal trip={selectedTrip} onClose={() => setVoteOpen(false)} onSuccess={() => { setVotes((current) => ({ ...current, [selectedTrip.id]: (current[selectedTrip.id] || 0) + 1 })); setVoteOpen(false); setToast('投票已提交，已记录你的日期与人数。') }} onFailure={setToast} />}
+    {isVoteOpen && <VoteModal trip={selectedTrip} onClose={() => setVoteOpen(false)} onSuccess={() => { setVoteOpen(false); setToast('投票已提交，已记录你的日期与人数。') }} onFailure={setToast} />}
     {toast && <div className="toast"><Check size={16} /> {toast}</div>}
     <footer>团建最终敲定 · 请以场地实时信息与最终团队报价为准</footer>
   </div>
 }
 
-function TripGroup({ trips: groupTrips, activeId, votes, onSelect }: { trips: TripPlan[]; activeId: string; votes: Record<string, number>; onSelect: (id: string) => void }) {
-  return <section className="trip-group"><div className="trip-group-heading"><div><strong>2 天 1 夜 · 最终候选</strong><small>轻松自由、吃喝体验与家庭参与优先</small></div><span>{groupTrips.length}</span></div><div className="trip-list">{groupTrips.map((trip, index) => <TripListItem key={trip.id} trip={trip} index={index} active={activeId === trip.id} votes={votes[trip.id] || 0} onClick={() => onSelect(trip.id)} />)}</div></section>
+function TripGroup({ trips: groupTrips, activeId, onSelect }: { trips: TripPlan[]; activeId: string; onSelect: (id: string) => void }) {
+  return <section className="trip-group"><div className="trip-group-heading"><div><strong>2 天 1 夜 · 最终候选</strong><small>轻松自由、吃喝体验与家庭参与优先</small></div><span>{groupTrips.length}</span></div><div className="trip-list">{groupTrips.map((trip, index) => <TripListItem key={trip.id} trip={trip} index={index} active={activeId === trip.id} onClick={() => onSelect(trip.id)} />)}</div></section>
 }
 
-function TripListItem({ trip, index, active, votes, onClick }: { trip: TripPlan; index: number; active: boolean; votes: number; onClick: () => void }) {
-  return <button className={`trip-item duration-2day ${active ? 'active' : ''}`} onClick={onClick}><span className="trip-index">{String(index + 1).padStart(2, '0')}</span><span className="trip-item-main"><strong>{trip.destination}</strong><span>{trip.title}</span><small>{trip.tags.slice(0, 2).join(' · ')}</small></span><span className="trip-item-side"><b>{votes}</b><small>票</small><ChevronRight size={16} /></span></button>
+function TripListItem({ trip, index, active, onClick }: { trip: TripPlan; index: number; active: boolean; onClick: () => void }) {
+  return <button className={`trip-item duration-2day ${active ? 'active' : ''}`} onClick={onClick}><span className="trip-index">{String(index + 1).padStart(2, '0')}</span><span className="trip-item-main"><strong>{trip.destination}</strong><span>{trip.title}</span><small>{trip.tags.slice(0, 2).join(' · ')}</small></span><ChevronRight size={16} aria-hidden="true" /></button>
 }
 
-function TripDetail({ trip, votes, onVote }: { trip: TripPlan; votes: number; onVote: () => void }) {
+function TripDetail({ trip, onVote }: { trip: TripPlan; onVote: () => void }) {
   return <div className="detail-enter" key={trip.id}>
     <div className="detail-hero duration-2day"><div className="hero-orbit orbit-one" /><div className="hero-orbit orbit-two" /><div className="detail-hero-copy"><span className="detail-overline">2 天 1 夜 · 最终候选</span><h3>{trip.destination}</h3><p>{trip.title}</p></div><div className="hero-ticket"><Ticket size={15} /> {trip.budget}</div></div>
-    <div className="detail-content"><div className="detail-title-row"><div><div className="detail-meta"><MapPin size={15} /> {trip.travelTime}</div><h2>{trip.title}</h2></div><div className="vote-count"><Heart size={16} fill="currentColor" /> <strong>{votes}</strong><span>票</span></div></div><p className="detail-summary">{trip.summary}</p><div className="tag-row">{trip.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><CommunitySources trip={trip} /><div className="schedule-heading"><span>行程预览</span><small>组织前请以场地实时信息为准</small></div><div className="schedule-list">{trip.schedule.map((item) => <div className="schedule-item" key={item.time}><time>{item.time}</time><div><strong>{item.title}</strong><p>{item.detail}</p></div></div>)}</div><div className="reminder-box"><div><CircleHelp size={17} /><strong>执行提醒</strong></div><ul>{trip.reminders.map((item) => <li key={item}>{item}</li>)}</ul></div><button className="vote-button" onClick={onVote}><Heart size={17} fill="currentColor" /> 选择可参加日期与人数 <span><ArrowRight size={15} /></span></button></div>
+    <div className="detail-content"><div className="detail-title-row"><div><div className="detail-meta"><MapPin size={15} /> {trip.travelTime}</div><h2>{trip.title}</h2></div></div><p className="detail-summary">{trip.summary}</p><div className="tag-row">{trip.tags.map((tag) => <span key={tag}>{tag}</span>)}</div><CommunitySources trip={trip} /><div className="schedule-heading"><span>行程预览</span><small>组织前请以场地实时信息为准</small></div><div className="schedule-list">{trip.schedule.map((item) => <div className="schedule-item" key={item.time}><time>{item.time}</time><div><strong>{item.title}</strong><p>{item.detail}</p></div></div>)}</div><div className="reminder-box"><div><CircleHelp size={17} /><strong>执行提醒</strong></div><ul>{trip.reminders.map((item) => <li key={item}>{item}</li>)}</ul></div><button className="vote-button" onClick={onVote}><Heart size={17} fill="currentColor" /> 选择可参加日期与人数 <span><ArrowRight size={15} /></span></button></div>
   </div>
 }
 
@@ -117,6 +115,7 @@ function CommunitySources({ trip }: { trip: TripPlan }) {
 function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; onClose: () => void; onSuccess: () => void; onFailure: (message: string) => void }) {
   const weekends = useMemo(() => availableWeekends(), [])
   const [selectedWeekendStarts, setSelectedWeekendStarts] = useState<string[]>([])
+  const [voterName, setVoterName] = useState('')
   const [adults, setAdults] = useState(1)
   const [children, setChildren] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -124,9 +123,10 @@ function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; on
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     const selectedWeekends = weekends.filter((item) => selectedWeekendStarts.includes(item.start))
-    if (!selectedWeekends.length || adults + children < 1) return
+    const name = voterName.trim()
+    if (!name || !selectedWeekends.length || adults + children < 1) return
     setSubmitting(true)
-    const result = await submitVote({ tripId: trip.id, duration: trip.duration, adults, children, weekends: selectedWeekends.map((weekend) => ({ ...weekend, month: new Date(`${weekend.start}T00:00:00`).getMonth() + 1 })) })
+    const result = await submitVote({ tripId: trip.id, voterName: name, duration: trip.duration, adults, children, weekends: selectedWeekends.map((weekend) => ({ ...weekend, month: new Date(`${weekend.start}T00:00:00`).getMonth() + 1 })) })
     setSubmitting(false)
     if (result.ok) onSuccess()
     else if (result.reason === 'already-voted') onFailure('所选日期中有已提交记录，请取消该日期后重试')
@@ -137,7 +137,7 @@ function VoteModal({ trip, onClose, onSuccess, onFailure }: { trip: TripPlan; on
     setSelectedWeekendStarts((current) => current.includes(weekendStart) ? current.filter((item) => item !== weekendStart) : [...current, weekendStart])
   }
 
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Users size={20} /></div><div className="section-kicker">FINAL VOTE</div><h2>选择日期与同行人数</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><fieldset><legend>选择日期 <span className="multi-select-label">可多选</span></legend><p className="calendar-rule">勾选所有你能参加的完整周末，最终将选择大家都合适的时间；已排除法定节假日和周末调休上班日</p>{weekends.length ? <div className="weekend-list">{weekends.map((weekend) => <label className={`weekend-option ${selectedWeekendStarts.includes(weekend.start) ? 'selected' : ''}`} key={weekend.start}><input type="checkbox" name="weekend" value={weekend.start} checked={selectedWeekendStarts.includes(weekend.start)} onChange={() => toggleWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>)}</div> : <p className="no-weekends">目前没有符合条件的完整周末。</p>}</fieldset><fieldset><legend>同行人数</legend><div className="participant-grid"><NumberStepper label="大人" note="成人" value={adults} minimum={0} onChange={setAdults} /><NumberStepper label="小孩" note="儿童" value={children} minimum={0} onChange={setChildren} /></div></fieldset><button className="submit-suggestion" disabled={submitting || !selectedWeekendStarts.length || adults + children < 1}>{submitting ? '提交中…' : `确认 ${selectedWeekendStarts.length} 个日期并投票`} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 每个勾选日期都会记录相同人数，用于汇总最适合全员的时间</div></div></div>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="vote-modal"><button className="modal-close" onClick={onClose} aria-label="关闭"><X size={18} /></button><div className="modal-icon"><Users size={20} /></div><div className="section-kicker">FINAL VOTE</div><h2>选择日期与同行人数</h2><p className="modal-lead">{trip.destination} · {trip.title}</p><form onSubmit={handleSubmit}><fieldset className="voter-name-field"><legend>你的姓名</legend><label><span className="sr-only">姓名</span><input type="text" value={voterName} onChange={(event) => setVoterName(event.target.value)} placeholder="请填写姓名，方便汇总" maxLength={30} autoComplete="off" required /></label><small>仅用于本次投票汇总，关闭后不会保存在浏览器中。</small></fieldset><fieldset><legend>选择日期 <span className="multi-select-label">可多选</span></legend><p className="calendar-rule">勾选所有你能参加的完整周末，最终将选择大家都合适的时间；已排除法定节假日和周末调休上班日</p>{weekends.length ? <div className="weekend-list">{weekends.map((weekend) => <label className={`weekend-option ${selectedWeekendStarts.includes(weekend.start) ? 'selected' : ''}`} key={weekend.start}><input type="checkbox" name="weekend" value={weekend.start} checked={selectedWeekendStarts.includes(weekend.start)} onChange={() => toggleWeekend(weekend.start)} /><span><strong>{weekend.label}</strong><small>周六入住，周日返程</small></span><Check size={16} /></label>)}</div> : <p className="no-weekends">目前没有符合条件的完整周末。</p>}</fieldset><fieldset><legend>同行人数</legend><div className="participant-grid"><NumberStepper label="大人" note="成人" value={adults} minimum={0} onChange={setAdults} /><NumberStepper label="小孩" note="儿童" value={children} minimum={0} onChange={setChildren} /></div></fieldset><button className="submit-suggestion" disabled={submitting || !voterName.trim() || !selectedWeekendStarts.length || adults + children < 1}>{submitting ? '提交中…' : `确认 ${selectedWeekendStarts.length} 个日期并投票`} <ArrowRight size={16} /></button></form><div className="modal-footnote"><Users size={14} /> 每个勾选日期都会记录相同人数，用于汇总最适合全员的时间</div></div></div>
 }
 
 function NumberStepper({ label, note, value, minimum, onChange }: { label: string; note: string; value: number; minimum: number; onChange: (value: number) => void }) {
