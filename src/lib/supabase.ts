@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { retreat } from '../data/retreat'
 
 const url = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || undefined
@@ -6,42 +7,29 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_P
 export const hasSupabase = Boolean(url && anonKey)
 export const supabase: SupabaseClient | null = hasSupabase ? createClient(url!, anonKey!) : null
 
-const voterStorageKey = 'team-retreat-voter-key'
-
-function getVoterKey() {
-  const saved = localStorage.getItem(voterStorageKey)
+function getRegistrantKey() {
+  const storageKey = 'team-retreat-voter-key'
+  const saved = localStorage.getItem(storageKey)
   if (saved) return saved
-  const voterKey = crypto.randomUUID()
-  localStorage.setItem(voterStorageKey, voterKey)
-  return voterKey
+  const key = crypto.randomUUID()
+  localStorage.setItem(storageKey, key)
+  return key
 }
 
-export async function submitVote(input: {
-  tripId: string
-  voterName: string
-  duration: string
-  adults: number
-  children: number
-  weekends: { month: number; start: string; end: string; isPriority: boolean }[]
-}) {
+export async function submitRegistration(input: { name: string; adults: number; children: number }) {
   if (!supabase) return { ok: false as const, reason: 'not-configured' as const }
-  const voterKey = getVoterKey()
-  const voterName = input.voterName.trim()
-  const { error } = await supabase.from('trip_votes').insert(input.weekends.map((weekend) => ({
-    trip_id: input.tripId,
-    month: weekend.month,
-    duration: input.duration,
-    voter_name: voterName,
-    weekend_start: weekend.start,
-    weekend_end: weekend.end,
-    attendance_date: weekend.start,
+  const { error } = await supabase.from('trip_registrations').insert({
+    event_id: retreat.id,
+    destination: retreat.destination,
+    departure_date: retreat.start,
+    return_date: retreat.end,
+    participant_name: input.name.trim(),
     adult_count: input.adults,
     child_count: input.children,
-    is_priority: weekend.isPriority,
-    voter_key: voterKey,
-  })))
+    registrant_key: getRegistrantKey(),
+  })
   if (!error) return { ok: true as const }
   return error.code === '23505'
-    ? { ok: false as const, reason: 'already-voted' as const }
-    : { ok: false as const, reason: 'database' as const, message: error.message }
+    ? { ok: false as const, reason: 'already-registered' as const }
+    : { ok: false as const, reason: 'database' as const }
 }

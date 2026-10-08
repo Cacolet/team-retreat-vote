@@ -1,14 +1,12 @@
-# 成都近郊员工团建共创站
+# 西岭雪山团建报名
 
-独立的 Vite + React 投票站，适合直接通过 GitHub Pages 部署。方案内容来自《成都近郊员工团建方案_2026年8-10月》，支持：
+独立的 Vite + React 人数登记站，通过 Supabase 保存报名并通过 GitHub Pages 部署。本次活动固定为西岭雪山，2026 年 10 月 17–18 日（两天一夜）。
 
-- 8 / 9 / 10 月筛选
-- 1 天、2 天 1 夜切换
-- 候选行程列表与右侧滑入详情预览
-- 姓名、候选方案与可参加周末的必填投票
-- 只展示 Supabase 中的真实票数，不混入模拟数据
-- 选择月份后，自动列出从当天起该月份内可参加的完整周末
-- 右下角浮动「提想法」弹框，收集月份、天数和行程规划
+- 必填姓名，不在浏览器持久保存
+- 大人（含本人）至少 1 人、小孩至少 0 人
+- 页面仅展示本次填写人数和成功反馈，不读取报名名单或总人数
+- 本次确认报名独立存储在 `trip_registrations`；历史 `trip_votes` 不计入本次人数
+- 每个浏览器匿名标识在同一活动中只能登记一次；更换浏览器或清除存储可绕过此限制，管理员仍需按姓名核对重复报名
 
 ## 本地运行
 
@@ -25,19 +23,19 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-## 开启数据库投票
+## 开启数据库登记
 
-1. 首次部署时，在已连接的 Supabase 项目 SQL Editor 执行 `supabase/001_team_retreat.sql`。
-2. 如果此前已经执行过 `001_team_retreat.sql`，再执行 `supabase/002_add_attendance_date.sql`，以支持 1 天方案单独选择周六或周日。
-3. 重新加载本地页面；状态会显示「实时同步投票」，票数将从 `trip_votes` 读取。
-4. 在 Table Editor 按 `month`、`weekend_start`、`attendance_date` 查看各个日期的报名意向。
-5. 不要把 `SUPABASE_SERVICE_ROLE_KEY` 放到前端或 GitHub Secrets；这个项目只需要 anon key。
+1. 在 Supabase 项目 SQL Editor 执行 `supabase/007_create_trip_registrations.sql`。该脚本无需执行旧的投票迁移，且不会清空任何历史投票。
+2. 配好公开 URL 和 anon key 后即可提交真实报名。
+3. 管理员在 Table Editor 的 `trip_registrations` 查看姓名与成人、儿童人数；SQL 脚本末尾提供人数汇总查询。
+4. 新表启用 RLS，只允许公众写入本次活动报名，公众无权读取、修改或删除报名。
+5. 不要把 `SUPABASE_SERVICE_ROLE_KEY` 放到前端；这个项目只需要 anon key。
 
 工作区根目录已有 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 时，本项目本地开发会自动复用这两项公开配置；独立部署时使用上面的 `VITE_*` 配置即可。
 
 ## 是否需要后端服务？
 
-不需要额外自建 Node / Java 后端。Supabase 提供数据库、行级安全策略和公开 API，浏览器可以用 anon key 直接提交受 RLS 约束的投票。只有需要管理员审核、企业登录、导出隐私数据或更严格的反刷票时，才建议增加服务端接口或 Edge Function。
+不需要额外自建 Node / Java 后端。Supabase 提供数据库、行级安全策略和公开 API，浏览器可以用 anon key 直接提交受 RLS 约束的报名。
 
 ## GitHub Pages 自动部署
 
