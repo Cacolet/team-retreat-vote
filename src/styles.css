@@ -49,6 +49,24 @@ h1, h2, p { margin: 0; }
 .registration-name input::placeholder { color: #788496; }
 .registration-people { margin: 0; padding: 0; border: 0; }
 .registration-people legend { margin-bottom: 12px; padding: 0; font-size: 15px; font-weight: 500; }
+.registration-transport { margin: 0; padding: 0; border: 0; }
+.registration-transport legend { padding: 0; font-size: 15px; font-weight: 500; }
+.registration-transport legend small { margin-left: 6px; color: #929dae; font-size: 11px; font-weight: 400; }
+.registration-transport > p { margin: 7px 0 12px; color: #9ca8b9; font-size: 12px; line-height: 1.6; }
+.transport-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.transport-option { display: flex; align-items: center; gap: 9px; padding: 15px 12px; background: #202631; border: 1px solid #354050; border-radius: 8px; cursor: pointer; }
+.transport-option input { width: 15px; height: 15px; margin: 0; flex-shrink: 0; accent-color: #8995ff; }
+.transport-option > svg { flex-shrink: 0; color: #a9b3c6; }
+.transport-option strong, .transport-option small { display: block; }
+.transport-option strong { font-size: 14px; font-weight: 600; }
+.transport-option small { margin-top: 5px; color: #9ca8b9; font-size: 10px; line-height: 1.5; }
+.transport-option.selected { border-color: #7886e5; background: #8995ff1a; }
+.transport-option.selected > svg { color: #bac2ff; }
+.registration-transport:disabled .transport-option { cursor: wait; opacity: .65; }
+.registration-loading { margin-top: 18px; color: #acb7ff; font-size: 13px; line-height: 1.6; }
+.success-transport { display: flex; align-items: center; gap: 8px; }
+.registration-edit { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 24px; padding: 12px 15px; color: #ccd3ff; background: #8995ff12; border: 1px solid #46527b; border-radius: 7px; font-size: 14px; }
+.registration-edit:hover { background: #8995ff25; }
 .registration-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .registration-counter { min-width: 0; padding: 17px 13px; background: #202631; border: 1px solid #354050; border-radius: 8px; }
 .counter-label { color: #e0e6f1; font-size: 15px; font-weight: 600; }
@@ -91,5 +109,6 @@ h1, h2, p { margin: 0; }
   .counter-label { font-size: 14px; }
   .registration-count-grid { gap: 9px; }
   .registration-success { min-height: 340px; }
+  .transport-options { grid-template-columns: 1fr; gap: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
