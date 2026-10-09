@@ -41,6 +41,16 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 已有记录的 `transport_mode` 为 NULL，表示出行方式待确认。管理员可运行 008 脚本末尾的汇总查询分别统计大巴、自驾和待确认人数；自驾报名份数不等于车辆数。
 
+## 独立数据统计页
+
+通过 `/#/registrations` 直接访问，报名页面没有入口。本地地址是 `http://127.0.0.1:5173/#/registrations`；GitHub Pages 地址为站点部署地址后追加 `#/registrations`。Hash 路由支持直接访问和刷新。
+
+执行 `supabase/009_registration_stats.sql` 前，将脚本中的管理员口令变量 `REPLACE_WITH_YOUR_ADMIN_PASSWORD` 替换为你设置的非空口令（1–256 位）。执行后即可输入该口令查看总人数、大巴、自驾、待确认人数和姓名明细。脚本保留原报名数据，不开放整表匿名查询。管理员口令及统计数据不写入浏览器存储；刷新或锁定页面后需重新验证。
+
+再次执行 009 并设置新口令可更换访问口令。统计页按报名记录汇总，跨浏览器重复报名仍需要管理员按姓名核对。
+
+若忘记口令或设置后仍无法登录，修改 `supabase/010_reset_stats_password.sql` 中 `new_password` 的赋值，并在页面配置的同一 Supabase 项目执行完整脚本。脚本会移除旧的 12 位最低长度限制、重置口令并调用统计函数验证；验证通过才提交，且不改动报名记录。
+
 ## GitHub Pages 自动部署
 
 1. 将 `team-retreat-vote` 目录作为一个新的 GitHub 仓库根目录。

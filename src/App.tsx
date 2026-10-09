@@ -2,8 +2,19 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, Bus, CalendarDays, Car, Check, CheckCircle2, MapPin, Minus, Mountain, Plus, Users } from 'lucide-react'
 import { retreat } from './data/retreat'
 import { hasSupabase, loadRegistration, submitRegistration, type TransportMode } from './lib/supabase'
+import { RegistrationStatsPage } from './pages/RegistrationStatsPage'
 
 export function App() {
+  const [hash, setHash] = useState(() => typeof window === 'undefined' ? '' : window.location.hash)
+  useEffect(() => {
+    const onHashChange = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+  return hash.replace(/\/$/, '') === '#/registrations' ? <RegistrationStatsPage /> : <RegistrationApp />
+}
+
+function RegistrationApp() {
   const [name, setName] = useState('')
   const [adults, setAdults] = useState(1)
   const [children, setChildren] = useState(0)
